@@ -1,0 +1,134 @@
+---
+title: "Final Data Project"
+author: "Brayden Caleb"
+date: '2022-07-26'
+output:
+  html_document: 
+    theme: readable
+    toc: yes
+  pdf_document: default
+urlcolor: cyan
+---
+
+***
+
+```{r setup, echo = FALSE, message = FALSE, warning = FALSE}
+options(scipen = 1, digits = 4, width = 80, fig.align = "center")
+```
+
+## Introduction
+The data we have chosen to look at is Housing Prices in California. This data comes from Kaggle (https://www.kaggle.com/datasets/fedesoriano/california-housing-prices-data-extra-features) and outlines data that would go in to predicting the price of a house in California. As people who currently rent (and one of us living in California), we hope to one day be able to purchase a home and being able to understand this model could help us determine important factors in predicting the price and whether future ones we intend to buy are a good deal or not. Our model will predict `Median House Value`, which will take possible predictors like `Median Income` and `Total Rooms` to predict that price. 
+
+
+## Methods
+First we need to load in the data and prepare some of the columns. To augment the data a bit, we need to take the predictors `Distance to Los Angeles`, `Distance to Los Angeles`, `Distance to Los Angeles`, and `Distance to Los Angeles` and convert them in to a single column that is a factor variable. This segments the data a bit in to regions of California and if there is any relevance in being closer to one city vs. another.
+
+```{r}
+library(readr)
+housing_data =  read_csv("California_Houses.csv")
+nearest_city = rep("", nrow(housing_data))
+
+nearest_city_options = c("LA", "San Diego", "San Jose", "San Fransisco")
+
+for (i in 1:nrow(housing_data)) {
+ subset = housing_data[i,c("Distance_to_LA", "Distance_to_SanDiego", "Distance_to_SanJose", "Distance_to_SanFrancisco")]
+ 
+ nearest_city[i] = nearest_city_options[which.min(subset)]
+}
+
+housing_data$nearest_city = as.factor(nearest_city)
+
+```
+
+Below is a peak at the data, with the new added column
+```{r, eval=FALSE}
+head(housing_data)
+```
+
+
+
+With the data loaded and prepped we want to start building the model. Before we do that, we want to check the pairs of all the different variables to see if there are and predictors we need to transform.
+
+```{r}
+library(GGally)
+ggpairs(housing_data,
+        columns = c(1, 2:5),        # Columns
+        aes(color = nearest_city,  # Color by group (cat. variable)
+            alpha = 0.5))
+ggpairs(housing_data,
+        columns = c(1, 6:9),        # Columns
+        aes(color = nearest_city,  # Color by group (cat. variable)
+            alpha = 0.5))
+ggpairs(housing_data,
+        columns = c(1, 10:13),        # Columns
+        aes(color = nearest_city,  # Color by group (cat. variable)
+            alpha = 0.5))
+ggpairs(housing_data,
+        columns = c(1, 14:15),        # Columns
+        aes(color = nearest_city,  # Color by group (cat. variable)
+            alpha = 0.5))
+```
+It looks like median age has little to do with predicting the house value, so removing that will reduce our model size.
+
+```{r}
+housing_data = housing_data[,-c("Median_age")]
+```
+
+
+
+```{r}
+set.seed(420)
+housing_data_idx  = sample(nrow(housing_data), size = trunc(0.80 * nrow(housing_data)))
+housing_data_trn = housing_data[housing_data_idx, ]
+housing_data_tst = housing_data[-housing_data_idx, ]
+```
+
+
+```{r}
+add_model = lm(Median_House_Value ~ ., data = housing_data_trn)
+int_model = lm(Median_House_Value ~ (. - Distance_to_LA - Distance_to_SanDiego - Distance_to_SanJose - Distance_to_SanFrancisco) ^ 2, data = housing_data_trn)
+```
+
+```{r}
+library(faraway)
+vif(add_model)
+```
+
+```{r}
+add_model = lm(Median_House_Value ~ . - Distance_to_LA - Distance_to_SanDiego - Distance_to_SanJose - Distance_to_SanFrancisco, data = housing_data_trn)
+vif(add_model)
+```
+
+
+```{r, echo = FALSE}
+plot_fitted_resid = function(model, pointcol = "dodgerblue", linecol = "darkorange") {
+  plot(fitted(model), resid(model), 
+       col = pointcol, pch = 20, cex = 1.5,
+       xlab = "Fitted", ylab = "Residuals")
+  abline(h = 0, col = linecol, lwd = 2)
+}
+
+plot_qq = function(model, pointcol = "dodgerblue", linecol = "darkorange") {
+  qqnorm(resid(model), col = pointcol, pch = 20, cex = 1.5)
+  qqline(resid(model), col = linecol, lwd = 2)
+}
+```
+
+
+```{r}
+mod = step(int_model, direction = "backward", trace = 0)
+```
+
+
+## Results
+
+
+
+## Discussion
+
+
+## Appendix
+
+#### Group Members
+* Brayden Turner - brturne2 
+* Caleb Cimmarrusti - Calebtc2

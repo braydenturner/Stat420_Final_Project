@@ -1,82 +1,295 @@
 ---
 title: "Final Data Project"
-author: "Brayden Caleb"
 date: '2022-07-26'
 output:
   html_document: 
     theme: readable
     toc: yes
   pdf_document: default
-urlcolor: cyan
+  urlcolor: cyan
+  params:
+    hardcore: FALSE
 ---
+***    
+##Instructions DELETE BEFORE SUBMISSION
+
+[Project Instructions Page](https://d18ky98rnyall9.cloudfront.net/IAZ-yE1WQPWGfshNVoD1SQ_9a94df6ec90a4643aad57503dfa2a4f1_data-project-su22.html?Expires=1659225600&Signature=eLrwlUo9dqDJC3rmDl2CYqyfn1U-MreTF6Wgy7L5TfT6QfJHweAbSitGHvWi-XWmMx7b3m9EMCvATJkFvRBVyEgPExCRwB8OUQhhJrQtOyI2P437ms3fLT1aqcOoBxoR8tgJ84FYYXQexOvDURrboIn7CYkHTjCqCcK79tUiZMU_&Key-Pair-Id=APKAJLTNE6QMUY6HBC5A)
+
+[Project Instruction Video](https://mediaspace.illinois.edu/media/0_q1hn44wt)  
+
+
+**Notes from Video instructions**
+
+- Expectation is that we explore the data. Introduction lays out a much more robust background.
+- Methods section 1 is where we introduce some exploratory analysis, explore correlation analysis, scatterplots, colinearity, explore.
+- Methods section 2 is where we take our exploratory analysis then build some models and maybe we stop at additive, maybe we go from additive to interactive. analyze RMSE, adj.r.squared, residual std error.
+-No matter what we then look for how to improve our additive model by shrinking the model intelligently or growing the model.  
+
+- choose a couple of models into a table  
+-- model, AIC/BIC, number of variables, RMSE, some stats
+
+**The goal of the project is to explore the data, not make the best model**  
+The best way to fail is to make a path and just stick to it. Don't put the blinders on.
+
 
 ***
 
-```{r setup, echo = FALSE, message = FALSE, warning = FALSE}
+```{r, setup, echo = FALSE, message = FALSE, warning = FALSE}
 options(scipen = 1, digits = 4, width = 80, fig.align = "center")
+
+#This condition controls whether eval is set to true or false for more time consuming knits.
+hardcore = FALSE
 ```
 
 ## Introduction
-The data we have chosen to look at is Housing Prices in California. This data comes from Kaggle (https://www.kaggle.com/datasets/fedesoriano/california-housing-prices-data-extra-features) and outlines data that would go in to predicting the price of a house in California. As people who currently rent (and one of us living in California), we hope to one day be able to purchase a home and being able to understand this model could help us determine important factors in predicting the price and whether future ones we intend to buy are a good deal or not. Our model will predict `Median House Value`, which will take possible predictors like `Median Income` and `Total Rooms` to predict that price. 
+The data we have chosen to look at is Housing Prices in California. This data comes from Kaggle (https://www.kaggle.com/datasets/fedesoriano/california-housing-prices-data-extra-features) and outlines data that would go in to predicting the price of a house in California. As people who currently rent (and one of us living in California), we hope to one day be able to purchase a home and being able to understand this model could help us determine important factors in predicting the price and whether future ones we intend to buy are a good deal or not. 
+
+In this document we will modify and assess the data, then using our asssessments attempt to build a good model which does not overfit or underfit the data. We hope to be able to create a general model that based on some factors about a given property can give an expected price as an output. 
 
 
+Original Variables:  
+
+1. `Median_House_Value`: Median house value for households within a block (measured in US Dollars) [\$]  
+
+2. `Median_Income`: Median income for households within a block of houses (measured in tens of thousands of US Dollars) [10k\$]  
+
+3. `Median_Age`: Median age of a house within a block; a lower number is a newer building [years]  
+
+4. `Total_Rooms`: Total number of rooms within a block  
+
+5. `Total_Bedrooms`: Total number of bedrooms within a block  
+
+6. `Population`: Total number of people residing within a block  
+
+7. `Households`: Total number of households, a group of people residing within a home unit,
+for a block  
+
+8. `Latitude`: A measure of how far north a house is; a higher value is farther north [°]  
+
+9. `Longitude`: A measure of how far west a house is; a higher value is farther west [°]  
+
+10. `Distance_to_coast`: Distance to the nearest coast point [m]  
+
+11. `Distance_to_Los_Angeles`: Distance to the centre of Los Angeles [m]  
+
+12. `Distance_to_San_Diego`: Distance to the centre of San Diego [m]  
+
+13. `Distance_to_San_Jose`: Distance to the centre of San Jose [m]  
+
+14. `Distance_to_San_Francisco`: Distance to the centre of San Francisco [m]  
+
+Variables added by the group later in the project:  
+
+15. `dist_to_nearest_city`: The numeric minimum value of variables 11 through 14 divided by 1000 to convert to km. [km] 
+
+16. `nearest_city`: Categorical variable indicating which city of those lsited in variable 11 through 14 was the closest.[city name]  
+
+17. **??** `near_a_city`: a factor variable indicating 1 if a house is within 100 km of the nearest city or not. (Not sure here but I think it could help us with defining some stuff. Maybe 100-300 is better?)[0,1]
+
+***
+ 
 ## Methods
-First we need to load in the data and prepare some of the columns. To augment the data a bit, we need to take the predictors `Distance to Los Angeles`, `Distance to Los Angeles`, `Distance to Los Angeles`, and `Distance to Los Angeles` and convert them in to a single column that is a factor variable. This segments the data a bit in to regions of California and if there is any relevance in being closer to one city vs. another.
 
-```{r}
+### Data Analysis
+First we need to load in the data and prepare some of the columns. To augment the data a bit, we need to take the predictors `Distance to_Los Angeles`, `Distance to Los Angeles`, `Distance to Los Angeles`, and `Distance to Los Angeles` and convert them into three separate columns:
+- a factor variable `nearest_city`- This segments the data into regions of California and if there is any relevance in being closer to one city vs. another. 
+- a numeric variable `dist_to_nearest_city` - This will give us the distance to this nearest city in kms. 
+- a factor variable `near_a_city` - a 1 if the city is within 100km of the nearest city, a 0 otherwise.
+
+```{r, readin}
 library(readr)
-housing_data =  read_csv("California_Houses.csv")
+housing_data =  read.csv("California_Houses.csv")
 nearest_city = rep("", nrow(housing_data))
+dist_to_nearest = rep(0, nrow(housing_data))
+near_city = rep(0, nrow(housing_data))
+
 
 nearest_city_options = c("LA", "San Diego", "San Jose", "San Fransisco")
 
 for (i in 1:nrow(housing_data)) {
- subset = housing_data[i,c("Distance_to_LA", "Distance_to_SanDiego", "Distance_to_SanJose", "Distance_to_SanFrancisco")]
+ subset = housing_data[i,
+                       c("Distance_to_LA", 
+                         "Distance_to_SanDiego", 
+                         "Distance_to_SanJose", 
+                         "Distance_to_SanFrancisco")]
  
  nearest_city[i] = nearest_city_options[which.min(subset)]
+ dist_to_nearest[i] = min(subset) / 1000
+ near_city[i] = ifelse(dist_to_nearest[i] < 100, 1, 0)
 }
 
 housing_data$nearest_city = as.factor(nearest_city)
+housing_data$dist_to_nearest_city = dist_to_nearest
+housing_data$near_a_city = as.factor(near_city)
 
 ```
 
-Below is a peak at the data, with the new added column
-```{r, eval=FALSE}
-head(housing_data)
+
+We will then perform a quick assessment of the variables we just created.
+First we will inspect what percentage of the properties is closest to each city
+```{r, nearest-city-table}
+data.frame(
+Los_Angeles = mean(housing_data$nearest_city == "LA"),
+San_Diego = mean(housing_data$nearest_city == "San Diego"),
+San_Jose = mean(housing_data$nearest_city == "San Jose"),
+San_Fransisco = mean(housing_data$nearest_city == "San Fransisco"))
 ```
 
+And overall numbers for nearest city:  
+```{r, summary1}
+summary(housing_data$nearest_city)
+```
+
+Next we will gather some data on how far data points are from the nearest city.  
+```{r, summary2}
+summary(housing_data$dist_to_nearest_city)
+```
+
+And we will plot the distribution of distance as both a box plot and a histogram for help framing these distances.
+
+```{r, nearest-city-plots}
+par(mfrow = c(1,2))
+boxplot(housing_data$dist_to_nearest_city,
+        ylab = "Distance to Nearest City [km]",
+        main = "Boxplot of Distances to Nearest City")
+
+hist(housing_data$dist_to_nearest_city,
+     xlab = "Distnace ot Nearest City [km]",
+     main = "Histogram of Distances to Nearest City")
+```  
 
 
-With the data loaded and prepped we want to start building the model. Before we do that, we want to check the pairs of all the different variables to see if there are and predictors we need to transform.
 
+Between the summary information and the boxplot, we can assess that more than 3/4  of the properties in the dataset are within 100 km of the nearest city.
+
+```{r, mean-nearest-city}
+mean(housing_data$dist_to_nearest_city < 200)
+```  
+And 91.6% of the data is within 200 kms of the nearest city. This information may be a helpful dummy variable for understand how being either inside or outside of a city changes predictor variables. For now we will stick with just a 100km cutoff value in the `near_a_city` variable.
+
+```{r, near-a-city-assessment}
+mean(as.numeric(housing_data$near_a_city) - 1)
+```
+23.36% percent of data points are greater than 100 km's from the center of the nearest city.
+
+
+We will also run a quick sanity check that ensures that based on latitude and longitude we do indeed have the correct nearest city.
+
+```{r, plot-map}
+plot(Latitude ~ Longitude, housing_data,
+     col = nearest_city,
+     pch = as.numeric(nearest_city))
+legend("topright",
+       legend = levels(housing_data$nearest_city),
+       col = c(1:4),
+       pch = c(1:4)) 
+```  
+
+Having harvested the data from the distance to each city variable we will now eliminate them from the dataset in order to make plotting and analysis more manageable.  
+```{r, eliminate-cities}
+housing_data = subset(housing_data, select = -c(Distance_to_LA, Distance_to_SanFrancisco, Distance_to_SanDiego, Distance_to_SanJose))
+```
+
+```{r, listofnames}
+data.frame(name = names(housing_data))
+
+``` 
+
+
+With the data loaded and prepped we want to start building the model. Before we do that, we want to check the pairs of all the different variables to see what predictors have strong correlations.
+We will leave out
+- `Latitude`
+- `Longitude`
+And represent `nearest_city` as a color and `near_a_city` by symbol.
+
+```{r, plotem-all, eval=hardcore}
+plot(housing_data[ , c(1:7, 10,12)],
+     col = as.numeric(housing_data$nearest_city))
+```    
+A couple of obvious colinearities jump out.   
+- `Tot_Rooms` - `Tot_Bedrooms`  
 ```{r}
+cor(housing_data$Tot_Rooms, housing_data$Tot_Bedrooms)
+```  
+
+- `Tot_Rooms` - `Population`  
+```{r}
+cor(housing_data$Tot_Rooms, housing_data$Population)
+```
+
+- `Tot_Rooms` - `Households`  
+```{r}
+cor(housing_data$Tot_Rooms, housing_data$Households)
+```
+
+- `Tot_Bedrooms` - `Population`  
+```{r}
+cor(housing_data$Tot_Bedrooms, housing_data$Population)
+```  
+
+- `Tot_Bedrooms` - `Households`  
+```{r}
+cor(housing_data$Tot_Bedrooms, housing_data$Households)
+```  
+
+- `Population` - `Household`
+```{r}
+cor(housing_data$Population, housing_data$Households)
+```
+
+It appears that the variables that have to do with density see a strong positive correlation. This makes sense. As the total number of people within a block (`population`) increases, you also see an increase in total households within a block (`Households`) which leads to an increase in both total bedrooms (`Total_Bedrooms`) and total rooms (`Total_Rooms`). We are not attempting to demonstrate causation, simply how density indicators are linked to each other.
+
+
+
+
+
+We will also explore variable correlations within the context of whether they are close to or far away from the city, in order to check to see if any patterns emerge within either that were otherwise hidden.
+
+```{r, plotem-city-notcity, eval = hardcore}
+city = housing_data$near_a_city == 1
+non_city = ! city
+plot(housing_data[ city, c(1:7, 10,12)],
+     main = "City Based Plots",
+     col = "darkgray")
+
+plot(housing_data[ non_city, c(1:7, 10,12)],
+     main = "Non-City Based Plots",
+     col = "darkblue")
+```
+
+No further trends obviously emerge from breaking out the data into city vs non-city.
+
+
+
+```{r, pairs-plots, eval = hardcore}
 library(GGally)
-ggpairs(housing_data,
-        columns = c(1, 2:5),        # Columns
-        aes(color = nearest_city,  # Color by group (cat. variable)
-            alpha = 0.5))
-ggpairs(housing_data,
-        columns = c(1, 6:9),        # Columns
-        aes(color = nearest_city,  # Color by group (cat. variable)
-            alpha = 0.5))
-ggpairs(housing_data,
-        columns = c(1, 10:13),        # Columns
-        aes(color = nearest_city,  # Color by group (cat. variable)
-            alpha = 0.5))
-ggpairs(housing_data,
-        columns = c(1, 14:15),        # Columns
-        aes(color = nearest_city,  # Color by group (cat. variable)
-            alpha = 0.5))
+#commented this because I modified the columns and didn't want to mess with your mojo.
+# ggpairs(housing_data,
+#         columns = c(1, 2:5),        # Columns
+#         aes(color = nearest_city,  # Color by group (cat. variable)
+#             alpha = 0.5))
+# ggpairs(housing_data,
+#         columns = c(1, 6:9),        # Columns
+#         aes(color = nearest_city,  # Color by group (cat. variable)
+#             alpha = 0.5))
+# ggpairs(housing_data,
+#         columns = c(1, 10:13),        # Columns
+#         aes(color = nearest_city,  # Color by group (cat. variable)
+#             alpha = 0.5))
+# ggpairs(housing_data,
+#         columns = c(1, 14:15),        # Columns
+#         aes(color = nearest_city,  # Color by group (cat. variable)
+#             alpha = 0.5))
 ```
-It looks like median age has little to do with predicting the house value, so removing that will reduce our model size.
+It looks like median age has little to do with predicting the house value, so removing that will reduce our model size. **--Can we hold off on cutting age? Based on what I understand about realestate and tax brackets it may be relevant later... Though if it includes children might be a red herring because kids are balancing adult age. --**
 
-```{r}
-housing_data = housing_data[,-c("Median_age")]
-```
+```{r, eliminate-median}
+# housing_data = subset(housing_data,select = -c(Median_Age))
+```  
 
+### Model Creation and Refinement
 
-
-```{r}
+```{r, split-train-test}
 set.seed(420)
 housing_data_idx  = sample(nrow(housing_data), size = trunc(0.80 * nrow(housing_data)))
 housing_data_trn = housing_data[housing_data_idx, ]
@@ -84,23 +297,23 @@ housing_data_tst = housing_data[-housing_data_idx, ]
 ```
 
 
-```{r}
+```{r, model-1}
 add_model = lm(Median_House_Value ~ ., data = housing_data_trn)
-int_model = lm(Median_House_Value ~ (. - Distance_to_LA - Distance_to_SanDiego - Distance_to_SanJose - Distance_to_SanFrancisco) ^ 2, data = housing_data_trn)
+int_model = lm(Median_House_Value ~ (.) ^ 2, data = housing_data_trn)
 ```
 
-```{r}
+```{r, vif-1}
 library(faraway)
 vif(add_model)
 ```
 
-```{r}
-add_model = lm(Median_House_Value ~ . - Distance_to_LA - Distance_to_SanDiego - Distance_to_SanJose - Distance_to_SanFrancisco, data = housing_data_trn)
+```{r, model-2}
+add_model = lm(Median_House_Value ~ ., data = housing_data_trn)
 vif(add_model)
 ```
 
 
-```{r, echo = FALSE}
+```{r, make-plotting-functions, echo = FALSE}
 plot_fitted_resid = function(model, pointcol = "dodgerblue", linecol = "darkorange") {
   plot(fitted(model), resid(model), 
        col = pointcol, pch = 20, cex = 1.5,
@@ -115,20 +328,27 @@ plot_qq = function(model, pointcol = "dodgerblue", linecol = "darkorange") {
 ```
 
 
-```{r}
-mod = step(int_model, direction = "backward", trace = 0)
+```{r, aic-1}
+#mod = step(int_model, direction = "backward", trace = 0)
 ```
 
+### Model Comparison and Selection
+
+***
 
 ## Results
 
 
+*** 
 
 ## Discussion
 
+*** 
 
 ## Appendix
 
+***
+ 
 #### Group Members
 * Brayden Turner - brturne2 
 * Caleb Cimmarrusti - Calebtc2

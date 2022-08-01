@@ -70,19 +70,19 @@ for a block
 
 10. `Distance_to_coast`: Distance to the nearest coast point [m]  
 
-11. `Distance_to_Los_Angeles`: Distance to the centre of Los Angeles [m]  
+11. `Distance_to_Los_Angeles`: Distance to the center of Los Angeles [m]  
 
-12. `Distance_to_San_Diego`: Distance to the centre of San Diego [m]  
+12. `Distance_to_San_Diego`: Distance to the center of San Diego [m]  
 
-13. `Distance_to_San_Jose`: Distance to the centre of San Jose [m]  
+13. `Distance_to_San_Jose`: Distance to the center of San Jose [m]  
 
-14. `Distance_to_San_Francisco`: Distance to the centre of San Francisco [m]  
+14. `Distance_to_San_Francisco`: Distance to the center of San Francisco [m]  
 
 Variables added by the group later in the project:  
 
 15. `dist_to_nearest_city`: The numeric minimum value of variables 11 through 14 divided by 1000 to convert to km. [km] 
 
-16. `nearest_city`: Categorical variable indicating which city of those lsited in variable 11 through 14 was the closest.[city name]  
+16. `nearest_city`: Categorical variable indicating which city of those listed in variable 11 through 14 was the closest.[city name]  
 
 17. `near_a_city_100`: a factor variable indicating 1 if a house is within 100 km of the nearest city or not. [0,1]
 
@@ -172,12 +172,12 @@ And we will plot the distribution of distance as both a box plot and a histogram
 ```{r, nearest-city-plots}
 par(mfrow = c(1,2))
 boxplot(housing_data$dist_to_nearest_city,
-        ylab = "Distance to Nearest City [km]",
-        main = "Boxplot of Distances to Nearest City")
+        ylab = "Distance [km]",
+        main = "Boxplot of Distances\n to Nearest City")
 
 hist(housing_data$dist_to_nearest_city,
-     xlab = "Distnace ot Nearest City [km]",
-     main = "Histogram of Distances to Nearest City")
+     xlab = "Distance [km]",
+     main = "Histogram of Distances\n to Nearest City")
 ```  
 
 
@@ -189,7 +189,7 @@ housing_data$near_a_city_100 = as.factor(housing_data$dist_to_nearest_city < 100
 
 ```
 
-We also see that around the 200 km mark is where the whisker ends on our boxplot above so we will investigate what proportion of data falls within 200 km
+We also see that around the 200km mark is where the whisker ends on our boxplot above so we will investigate what proportion of data falls within 200 km
 
 ```{r, assess-200-dist}
 mean(housing_data$dist_to_nearest_city < 200)
@@ -202,8 +202,6 @@ housing_data$near_a_city_200 = as.factor(housing_data$dist_to_nearest_city < 200
 ```
 
 
-
-
 Our hope here is that one of the two factor variables created will be a sufficient demarcation line to where certain variables start to have differing effects on the response when we build a model. We will explore that further later.
 
 ```{r, near-a-city-assessment}
@@ -214,12 +212,12 @@ mean(as.numeric(housing_data$near_a_city_100) - 1)
 ```{r}
 mean(as.numeric(housing_data$near_a_city_200) - 1)
 ```
-91.61% percent of data points are within  100 km's of the center of the nearest city.
+91.61% percent of data points are within  200 km's of the center of the nearest city.
 
 
 
 
-Having harvested the data from the distance to each city variable we will now eliminate them from the dataset in order to make plotting and analysis more manageable.  
+Having harvested the data from the distances to each city variable we will now eliminate them from the dataset in order to make plotting and analysis more manageable.  
 ```{r, eliminate-cities}
 housing_data = subset(housing_data, 
                       select = -c(Distance_to_LA,
@@ -247,36 +245,21 @@ plot(housing_data[ , c(2:7, 10,12)],
      main = "Plot of Every Variable vs Every Other Variable in Housing Data (some withheld)")
 ```    
 
-A couple of obvious colinearities jump out.   
+
+A couple of obvious colinearities jump out. To better see that numerically, we will use the `cor` function from the `faraway`
+
+```{r}
+round(cor(housing_data[ , c(2:10,12)]), 2)
+```
+
+Below are some of the variables with strong correlation
+
 - `Tot_Rooms` - `Tot_Bedrooms`  
-```{r}
-cor(housing_data$Tot_Rooms, housing_data$Tot_Bedrooms)
-```  
-
 - `Tot_Rooms` - `Population`  
-```{r}
-cor(housing_data$Tot_Rooms, housing_data$Population)
-```
-
 - `Tot_Rooms` - `Households`  
-```{r}
-cor(housing_data$Tot_Rooms, housing_data$Households)
-```
-
 - `Tot_Bedrooms` - `Population`  
-```{r}
-cor(housing_data$Tot_Bedrooms, housing_data$Population)
-```  
-
 - `Tot_Bedrooms` - `Households`  
-```{r}
-cor(housing_data$Tot_Bedrooms, housing_data$Households)
-```  
-
 - `Population` - `Household`
-```{r}
-cor(housing_data$Population, housing_data$Households)
-```
 
 It appears that the variables that have to do with density see a strong positive correlation. This makes sense. As the total number of people within a block (`population`) increases, you also see an increase in total households within a block (`Households`) which leads to an increase in both total bedrooms (`Total_Bedrooms`) and total rooms (`Total_Rooms`). We are not attempting to demonstrate causation, simply how density indicators are linked to each other.
 
@@ -302,7 +285,7 @@ plot(housing_data[ non_city, c(2:7, 10,12)],
 
 No further trends obviously emerge from breaking out the data into city vs non-city. 
 
-Before we move on from this we will attmept to see if any of the cities have colinearities specific to their locality. In order to do this we will repeat the previous step one for each city using only the city data, in hopes of isolating information specific to the major cities which cover most of the data.
+Before we move on from this we will attempt to see if any of the cities have colinearities specific to their locality. In order to do this we will repeat the previous step one for each city using only the city data, in hopes of isolating information specific to the major cities which cover most of the data.
 
 ```{r, city-individual-plots, eval = hardcore}
 levels(housing_data$nearest_city)
@@ -330,31 +313,6 @@ plot(housing_data[sj, c(2:7, 10,12)],
 ```
 
 
-
-```{r, pairs-plots, eval = hardcore}
-library(GGally)
-?pairs
-#commented this because I modified the columns and didn't want to mess with your mojo.
-# ggpairs(housing_data,
-#         columns = c(1, 2:5),        # Columns
-#         aes(color = nearest_city,  # Color by group (cat. variable)
-#             alpha = 0.5))
-# ggpairs(housing_data,
-#         columns = c(1, 6:9),        # Columns
-#         aes(color = nearest_city,  # Color by group (cat. variable)
-#             alpha = 0.5))
-# ggpairs(housing_data,
-#         columns = c(1, 10:13),        # Columns
-#         aes(color = nearest_city,  # Color by group (cat. variable)
-#             alpha = 0.5))
-# ggpairs(housing_data,
-#         columns = c(1, 14:15),        # Columns
-#         aes(color = nearest_city,  # Color by group (cat. variable)
-#             alpha = 0.5))
-```
-It looks like median age has little to do with predicting the house value, so removing that will reduce our model size. **--Can we hold off on cutting age? Based on what I understand about realestate and tax brackets it may be relevant later... Though if it includes children might be a red herring because kids are balancing adult age. --**
-
-
 The last graph we will create for assistance is a graph of `Median_House_Value` vs all other predictors.
 We will leave the graphs somewhat sparse to allow for 
 
@@ -369,48 +327,13 @@ plot(Median_House_Value ~ Households, housing_data, col = 6)
 plot(Median_House_Value ~ Latitude, housing_data, col = 7)
 plot(Median_House_Value ~ Distance_to_coast, housing_data, col = 8)
 plot(Median_House_Value ~ dist_to_nearest_city, housing_data, col = 9)
-
-
-
-
-
-
-
-
 ```
-
-
-```{r, eliminate-median}
-# housing_data = subset(housing_data,select = -c(Median_Age))
-```  
 
 ## Model Creation and Refinement
+To start things off, we are creating a few helper functions for helping us build and evaluate the models we create
 
-```{r, split-train-test}
-set.seed(420)
-housing_data_idx  = sample(nrow(housing_data), size = trunc(0.80 * nrow(housing_data)))
-housing_data_trn = housing_data[housing_data_idx, ]
-housing_data_tst = housing_data[-housing_data_idx, ]
-```
-
-
-```{r, model-1}
-add_model = lm(Median_House_Value ~ ., data = housing_data_trn)
-int_model = lm(Median_House_Value ~ (.) ^ 2, data = housing_data_trn)
-```
-
-```{r, vif-1}
-library(faraway)
-vif(add_model)
-```
-
-```{r, model-2}
-add_model = lm(Median_House_Value ~ ., data = housing_data_trn)
-vif(add_model)
-```
-
-
-```{r, make-plotting-functions, echo = FALSE}
+```{r, make-functions, echo = FALSE, message = FALSE, warning = FALSE}
+library(lmtest)
 plot_fitted_resid = function(model, pointcol = "dodgerblue", linecol = "darkorange") {
   plot(fitted(model), resid(model), 
        col = pointcol, pch = 20, cex = 1.5,
@@ -422,18 +345,162 @@ plot_qq = function(model, pointcol = "dodgerblue", linecol = "darkorange") {
   qqnorm(resid(model), col = pointcol, pch = 20, cex = 1.5)
   qqline(resid(model), col = linecol, lwd = 2)
 }
+
+get_bp_decision = function(model, alpha) {
+  decide = unname(bptest(model)$p.value < alpha)
+  ifelse(decide, "Reject", "Fail to Reject")
+}
+
+get_sw_decision = function(model, alpha) {
+  decide = unname(shapiro.test(resid(model))$p.value < alpha)
+  ifelse(decide, "Reject", "Fail to Reject")
+}
+
+get_num_params = function(model) {
+  length(coef(model))
+}
+
+get_loocv_rmse = function(model) {
+  sqrt(mean((resid(model) / (1 - hatvalues(model))) ^ 2))
+}
+
+get_adj_r2 = function(model) {
+  summary(model)$adj.r.squared
+}
 ```
 
 
-```{r, aic-1}
-#mod = step(int_model, direction = "backward", trace = 0)
+Now we want to get in to actually creating the model and choosing the best variables for prediction.Before we create any models however, we want to create a train / test set to use for evaluation later.
+
+```{r, split-train-test}
+set.seed(420)
+housing_data_idx  = sample(nrow(housing_data), size = trunc(0.80 * nrow(housing_data)))
+housing_data_trn = housing_data[housing_data_idx, ]
+housing_data_tst = housing_data[-housing_data_idx, ]
 ```
+
+First we will create a simple additive model.
+
+```{r, model-1}
+add_model = lm(Median_House_Value ~ ., data = housing_data_trn)
+summary(add_model)
+```
+
+Here we can see that all of the terms are important to building the model with a low `Pr(>|t|)`. We want to test the VIF with this model
+
+```{r, vif-1}
+library(faraway)
+summary(add_model)
+vif(add_model)
+```
+
+Here we can see a couple variables (Tot_Bedrooms, Households, Latitude, and Longitude) all have slightly high VIF. If we perform an F-test with a model with these removed we can check if these are important to keep.
+
+```{r, model-2}
+small_mod = lm(Median_House_Value ~ . - Tot_Bedrooms - Households - Latitude - Longitude, data = housing_data_trn)
+anova(small_mod, add_model)
+```
+
+Here we can see the p-value is <2e-16, so we would reject the smaller model and would say these variables are important. With some of these variables we would assume their interaction with others would be important, say number of bedrooms to the distance to city center. So here we create an interaction model between all of the variables. 
+
+```{r, interaction-model}
+int_mod = lm(Median_House_Value ~ . ^ 2, data = housing_data_trn)
+get_num_params(int_mod)
+```
+
 
 ## Model Comparison and Selection
+With the model we created above, we want to step through the parameters to see what's useful to use in our final model. We below we try backward and forward AIC to compare model size and later on LOOCV-RMSE.
+```{r, backward-parameter-selection, eval = hardcore}
+back_mod_aic = step(int_mod, direction = "backward", trace = 0)
+```
 
-***
+
+```{r,  forward-parameter-selection, eval = hardcore}
+mod = lm(Median_House_Value ~ 1, data = housing_data_trn)
+for_mod_aic = step(
+  mod,
+  scope = Median_House_Value ~ (Median_Income + Median_Age + Tot_Rooms + Tot_Bedrooms + Population + Households + Latitude + Longitude + Distance_to_coast +  nearest_city + dist_to_nearest_city + near_a_city_100 + near_a_city_200) ^ 2,
+  direction = "forward",
+  trace = 0)
+```
+
+
 
 # Results
+We now want to compare RMSE, $R^2$, and percent error of the different models we created.
+
+We did the forward and backward search of the interaction model above. So now we want to check num of parameters in the model
+
+```{r, eval = hardcore}
+get_num_params(back_mod_aic)
+get_num_params(for_mod_aic)
+```
+
+Here we can see our forward model has less parameters than the backward search, so we want to check RMSE for both.
+```{r, eval = hardcore}
+get_loocv_rmse(back_mod_aic)
+get_loocv_rmse(for_mod_aic)
+```
+
+The LOOCV-RMSE isn't significantly better, only `r (60487 - 60650) / 60487`% difference. So we would want the model with the lower complexity. We also ant to check RMSE for Train vs. Test for the 3 models (simple additive, interactive, step search model)
+
+```{r,RMSE, eval=hardcore}
+rmse = function(actual, predicted) {
+  sqrt(mean((actual - predicted) ^ 2))
+}
+
+rnames = c("Simple", "Interactive", "Step-Search")
+cnames = c("Train", "Test")
+results = matrix(rep(0, 6), nrow=3, dimnames = list(rnames, cnames))
+
+results[1, 1] = rmse(housing_data_trn[,"Median_House_Value"], predict(add_model, newdata = housing_data_trn))
+results[2, 1] = rmse(housing_data_trn[,"Median_House_Value"], predict(int_mod, newdata = housing_data_trn))
+results[3, 1] = rmse(housing_data_trn[,"Median_House_Value"], predict(for_mod_aic, newdata = housing_data_trn))
+results[1, 2] = rmse(housing_data_tst[,"Median_House_Value"], predict(add_model, newdata = housing_data_tst))
+results[2, 2] = rmse(housing_data_tst[,"Median_House_Value"], predict(int_mod, newdata = housing_data_tst))
+results[3, 2] = rmse(housing_data_tst[,"Median_House_Value"], predict(for_mod_aic, newdata = housing_data_tst))
+
+kable(results)
+```
+
+We now want to see how good our different models are at predicting data and each of their Adjusted $R^2$.
+
+```{r}
+
+library(knitr)
+library(scales)
+pred_simp = predict(add_model, newdata = housing_data_tst)
+pred_int = predict(int_mod, newdata = housing_data_tst)
+pred_chos = predict(for_mod_aic, newdata = housing_data_tst)
+act = housing_data_tst[,"Median_House_Value"]
+
+n = nrow(housing_data_tst)
+
+rnames = c("Simple", "Interactive", "Step-Search")
+cnames = c("Percent Error", "Adjusted R Squared")
+results = matrix(rep(0, 6), nrow=3, dimnames = list(rnames, cnames))
+
+results[1, 1] = (1/n) * sum( abs(pred_simp - act) / pred_simp ) * 100
+results[1, 2] = summary(add_model)$adj.r.squared
+results[2, 1] = (1/n) * sum( abs(pred_int - act) / pred_int ) * 100
+results[2, 2] = summary(int_mod)$adj.r.squared
+results[3, 1] = (1/n) * sum( abs(pred_chos - act) / pred_chos ) * 100
+results[3, 2] = summary(for_mod_aic)$adj.r.squared
+
+kable(results)
+
+# Graph
+opacity = .5
+point_size = .3
+
+plot(act, pred_simp, xlab = "Actual Prices", ylab = "Predicted Prices", col=alpha("dodgerblue", opacity), pch = 16, cex = point_size, main = "Actual vs. Predicted Home Prices")
+points(act, pred_int, col=alpha(2, opacity), pch = 16, cex = point_size)
+points(act, pred_chos, col=alpha(3, opacity), pch = 16, cex = point_size)
+abline(a = 0, b = 1, col = "darkorange", lwd = 3)
+legend("topleft", c("Simple Additive", "Interactive (Full)", "Interactive (AIC)"), col = c("dodgerblue", 2, 3), pch = 16)
+```
+
 
 
 *** 

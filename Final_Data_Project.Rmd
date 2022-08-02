@@ -38,10 +38,10 @@ The best way to fail is to make a path and just stick to it. Don't put the blind
 options(scipen = 1, digits = 4, width = 80, fig.align = "center")
 
 #This condition controls whether eval is set to true or false for more time consuming knits.
-hardcore = TRUE
+hardcore = FALSE
 ```
 
-# Introduction
+# 1.0 Introduction
 The data we have chosen to look at is Housing Prices in California. This data comes from [Kaggle](https://www.kaggle.com/datasets/fedesoriano/california-housing-prices-data-extra-features) and outlines data that would go in to predicting the price of a house in California. As people who currently rent (and one of us living in California), we hope to one day be able to purchase a home and being able to understand this model could help us determine important factors in predicting the price and whether future ones we intend to buy are a good deal or not. 
 
 In this document we will modify and assess the data, then using our asssessments attempt to build a good model which does not overfit or underfit the data. We hope to be able to create a general model that based on some factors about a given property can give an expected price as an output. 
@@ -90,14 +90,19 @@ Variables added by the group later in the project:
 
 ***
  
-# Methods
+# 2.0 Methods
 
-## Data Analysis and Refinement
-### Read-in
+## 2.1 Data Analysis and Refinement
+### 2.1.1 Read-in
 First we need to load in the data and prepare some of the columns. 
 
 ```{r, readin}
 library(readr)
+library(scales)
+library(knitr)
+library(lmtest)
+library(faraway)
+
 housing_data =  read.csv("California_Houses.csv")
 ```
 
@@ -106,7 +111,7 @@ To augment the data a bit, we need to take the predictors `Distance to_Los Angel
 - a factor variable `nearest_city`- This segments the data into regions of California and if there is any relevance in being closer to one city vs. another. 
 - a numeric variable `dist_to_nearest_city` - This will give us the distance to this nearest city in kms. 
 
-### Geographic Modifications and Assessment
+### 2.1.2 Geographic Modifications and Assessment
 
 ```{r}
 nearest_city = rep("", nrow(housing_data))
@@ -231,7 +236,7 @@ data.frame(name = names(housing_data))
 
 ``` 
 
-### General Data Analysis
+### 2.1.3 General Data Analysis
 
 With the data loaded and prepped we want to start building the model. Before we do that, we want to check the pairs of all the different predictor variables to see what predictors have strong correlations.
 We will leave out
@@ -329,11 +334,10 @@ plot(Median_House_Value ~ Distance_to_coast, housing_data, col = 8)
 plot(Median_House_Value ~ dist_to_nearest_city, housing_data, col = 9)
 ```
 
-## Model Creation and Refinement
+## 2.2 Model Creation and Refinement
 To start things off, we are creating a few helper functions for helping us build and evaluate the models we create
 
 ```{r, make-functions, echo = FALSE, message = FALSE, warning = FALSE}
-library(lmtest)
 plot_fitted_resid = function(model, pointcol = "dodgerblue", linecol = "darkorange") {
   plot(fitted(model), resid(model), 
        col = pointcol, pch = 20, cex = 1.5,
@@ -367,6 +371,29 @@ get_loocv_rmse = function(model) {
 get_adj_r2 = function(model) {
   summary(model)$adj.r.squared
 }
+
+
+rmse = function(actual, predicted) {
+  sqrt(mean((actual - predicted) ^ 2))
+}
+
+compare_models = function(models, model_names, training_data, test_data){
+  cnames = c("Number of Parameters", "Train RMSE", "Test RMSE", "VIF (mean)", "LOOCV", "Adj. R-Squared")
+  var_count = length(model_names)
+  col_count = length(cnames)
+  results = matrix(rep(0, var_count * col_count), nrow = var_count, ncol = col_count, dimnames = list(model_names, cnames))
+  
+  for (i in 1:var_count){
+    results[i, 1] = get_num_params(models[[i]])
+    results[i, 2] = rmse(training_data[,"Median_House_Value"], predict(models[[i]], newdata = training_data))
+    results[i, 3] = rmse(test_data[,"Median_House_Value"], predict(models[[i]], newdata = test_data))
+    results[i, 4] = mean(vif(models[[i]]))
+    results[i, 5] = get_loocv_rmse(models[[i]])
+    results[i, 6] = get_adj_r2(models[[i]])
+  }
+  results
+}
+
 ```
 
 
@@ -379,12 +406,14 @@ housing_data_trn = housing_data[housing_data_idx, ]
 housing_data_tst = housing_data[-housing_data_idx, ]
 ```
 
-What we will do next is start creating our models.
+What we will do next is start creating our models. We will refine and modify these models along the way and attempt to keep those which we deem significant.
 
-First we will create a full model with all predictors. This will act as a control for using all of the available data, but contains the most parameters.
+First we will create a full model with all predictors. This is a somewhat natural choice as a model which uses all available predictors is a simple and usable starting point.
 
 ```{r, full-additive-model}
 full_add_model = lm(Median_House_Value ~ ., data = housing_data_trn)
+sum(coef(summary(full_add_model) )[, 4] > 0.05)
+
 ```
 
 Next we will step through the model to see if any parameters are not needed from the above full model aren't necessarily useful. We will run this for both AIC and BIC.
@@ -392,91 +421,151 @@ Next we will step through the model to see if any parameters are not needed from
 ```{r, full-additive-model-search}
 n = length(resid(full_add_model))
 full_add_model_aic = step(full_add_model, direction = "backward", trace = 0)
+full_add_model_bic = step(full_add_model, direction = "backward", trace = 0, k = log(n))
+c(AIC = length(coef(full_add_model_aic)),
+  BIC = length(coef(full_add_model_bic)))
 ```
+We see that using a backwards AIC search we actually don't drop any variables from our search. BIC on the other hand dropped the  `Households` predictor from the model. We will use the BIC variant for comparison later.
 
-And finally on the additive models, we wanted to hand pick some of the parameters that we believe would have the best change at producing a good model. We will remove `Tot_Rooms`, `Tot_Bedrooms`, and `Population` since they have >.9 correlation with `Households`. We are also removing `Latitude` and `Longitude` since we extracted useful data close to cities. We will also transform `Distance_to_coast` and `dist_to_nearest_city` with a log function since we saw that house value drops off logarthithmically with distance from coast. We also drop `near_a_city_200` since we already have another Boolean for 100km. We also choose to drop `Media_Age` since from
+However we suspect this model may still be too cumbersome and we would like to explore how we might decrease the size of the model intelligently. Instead we will hand pick some variables to drop based on our analysis in **Section 2.1.3.**  We will remove `Tot_Rooms`, `Tot_Bedrooms`, and `Population` since they have >.9 correlation with `Households` in an effort to pare down these 4 predictors to a single predictor. Next we will remove `Latitude` and `Longitude` since we have tried to capture geographic information through the nearest city variables. We will also drop the `near_a_city_200` from the model since it is a binary that only differentiates ~9% of the data and have `near_a_city_100` to attempt to capture this distinction as well.
+
 
 ```{r, add-model-hand-picked}
-hand_picked_add_model = lm(Median_House_Value ~ . - Tot_Rooms - Tot_Bedrooms - Population - Latitude - Longitude - Distance_to_coast + log(Distance_to_coast)- dist_to_nearest_city + log(dist_to_nearest_city) - near_a_city_200 - Median_Age, data = housing_data_trn)
+hand_picked_add_model = lm(Median_House_Value ~ . - Tot_Rooms - Tot_Bedrooms - Population - Latitude - Longitude - near_a_city_200 - Median_Age, data = housing_data_trn)
 ```
 
+Then we will compare these models to see how they perform.
 
 ```{r}
-library(knitr)
-library(scales)
+mnames = c("Full", "BIC", "Hand Picked")
+models_to_compare = vector(mode="list", length=3)
+models_to_compare[[1]] = full_add_model
+models_to_compare[[2]] =  full_add_model_bic
+models_to_compare[[3]] = hand_picked_add_model
 
-rmse = function(actual, predicted) {
-  sqrt(mean((actual - predicted) ^ 2))
-}
-
-rnames = c("Full", "AIC", "Hand Picked")
-cnames = c("Train", "Test", "Num of Parameters")
-results = matrix(rep(0, 9), nrow=3, dimnames = list(rnames, cnames))
-
-results[1, 1] = rmse(housing_data_trn[,"Median_House_Value"], predict(full_add_model, newdata = housing_data_trn))
-results[2, 1] = rmse(housing_data_trn[,"Median_House_Value"], predict(full_add_model_aic, newdata = housing_data_trn))
-results[3, 1] = rmse(housing_data_trn[,"Median_House_Value"], predict(hand_picked_add_model, newdata = housing_data_trn))
-results[1, 2] = rmse(housing_data_tst[,"Median_House_Value"], predict(full_add_model, newdata = housing_data_tst))
-results[2, 2] = rmse(housing_data_tst[,"Median_House_Value"], predict(full_add_model_aic, newdata = housing_data_tst))
-results[3, 2] = rmse(housing_data_tst[,"Median_House_Value"], predict(hand_picked_add_model, newdata = housing_data_tst))
-results[1, 3] = get_num_params(full_add_model)
-results[2, 3] = get_num_params(full_add_model_aic)
-results[3, 3] = get_num_params(hand_picked_add_model)
-
-kable(results)
+comparison_table = compare_models(models_to_compare, mnames, housing_data_trn, housing_data_tst)
+kable(comparison_table)
 ```
 
+We see essentially no change to performance with the BIC and an improvement of the Variance Inflation Factor over the full model. We also see the hand-picked model performing decently well across most of the metrics but a substantial decreaase in VIF as well as a nice improvement in the number of indicators we have. It is a bit of a toss-up at this point as far as which models are best; reducing the numeber of predictors 40% is probably worth the performance decrease of about 10% in RMSE.
 
-# NARRATIVE for above
+However the model can still be improved. `dist_to_nearest_city` and `Distance_to_coast` both appear to have somewhat logarithmic relationships with `Median_House_Value`. So we will transform these two predictors in order to see how the model performs with this transform.
+
+
+
+```{r, add-model-hand-picked-transform}
+hand_picked_add_model_transform = lm(Median_House_Value ~ . - Tot_Rooms - Tot_Bedrooms - Population - Latitude - Longitude - Distance_to_coast + log(Distance_to_coast) - dist_to_nearest_city + log(dist_to_nearest_city) - near_a_city_200 - Median_Age, data = housing_data_trn)
+
+mnames = c("BIC", "Hand Picked", "Hand Picked with Transform")
+models_to_compare = vector(mode="list", length=3)
+models_to_compare[[1]] = full_add_model_bic
+models_to_compare[[2]] =  hand_picked_add_model
+models_to_compare[[3]] = hand_picked_add_model_transform
+
+comparison_table = compare_models(models_to_compare, mnames, housing_data_trn, housing_data_tst)
+kable(comparison_table)
+```
+
+This new hand picked model with transforms appears to be a very strong performer. Outperforming the hand picked model in VIF, and comparing just about on par with the BIC model.
+
+This new handpicked model is good but it is worth it at this point to see if any of the variables fail to reject the null hypothesis.
+
+```{r}
+which(coef(summary(hand_picked_add_model_transform))[, "Pr(>|t|)"] > 0.05)
+```
+San Jose being the closest appears to be insignificant. At this point we could include the variable because we deem it necessary, by going back and removing the Distance to San Jose column then only tracking distance to San Fransico, San Diego and Los Angeles. However for the sake of linearity we will not do that and instead press on with this model. We will also check how the current handpicked model performs if we cease tracking all nearest cities in an ANOVA test. As well as comparing the two models.
+
+```{r}
+no_city_add_model_transform = lm(Median_House_Value ~ . - Tot_Rooms - Tot_Bedrooms - Population - Latitude - Longitude - Distance_to_coast - nearest_city + log(Distance_to_coast) - dist_to_nearest_city + log(dist_to_nearest_city) - near_a_city_200 - Median_Age, data = housing_data_trn)
+anova(no_city_add_model_transform, hand_picked_add_model_transform)
+
+mnames = c("Cities", "No Cities")
+models_to_compare = vector(mode="list", length=2)
+models_to_compare[[1]] = hand_picked_add_model_transform
+models_to_compare[[2]] =  no_city_add_model_transform
+
+
+comparison_table = compare_models(models_to_compare, mnames, housing_data_trn, housing_data_tst)
+kable(comparison_table)
+
+```
+
+We see that dropping cities from the model does not pass an Anova test. We reduce the number of predictors from 9 to 6 which is substantial and worthwhile, but we also lose an important categorical predictor for the sake of lucidity  of our model. Meaning it is a simple and straightforward part of the model to track "Of these 4 major cities in California, which is the nearest" Therefore we will opt to maintain nearest city in the model for now. 
+
+However the work is not done yet. It is still worth inspecting whether noticeable performance gains can be made by increasing this model or allowing for interactions between the chosen variables. So for the sake of comparison we well allow for all possible interaction variables of the hand picked model with transformations.
+
 
 ```{r}
 hand_picked_int_model = lm(Median_House_Value ~ (. - Tot_Rooms - Tot_Bedrooms - Population - Latitude - Longitude - Distance_to_coast + log(Distance_to_coast)- dist_to_nearest_city + log(dist_to_nearest_city) - near_a_city_200 - Median_Age) ^ 2, data = housing_data_trn)
 ```
 
-Also AIC backward above
+We will also allow a backwards BIC search to attempt to pare this model down for us.
+
 
 ```{r}
-hand_picked_int_model_aic = step(hand_picked_int_model, direction = "backward", trace = 0)
+n = length(resid(hand_picked_int_model))
+
+hand_picked_int_model_aic = step(hand_picked_int_model,  direction = "backward", trace = 0, k = log(n))
 ```
 
+And finally we will compare these models.
 
-For 
 
 ```{r}
-rnames = c("Additive", "Fully Interactive", "Step")
-cnames = c("Train", "Test", "Num of Parameters")
-results = matrix(rep(0, 9), nrow=3, dimnames = list(rnames, cnames))
+mnames = c("Hand-Picked w/ Trans.", "Fully Interactive", "Step")
+models_to_compare = vector(mode="list", length=3)
+models_to_compare[[1]] = hand_picked_add_model_transform
+models_to_compare[[2]] =  hand_picked_int_model
+models_to_compare[[3]] = hand_picked_int_model_aic
 
-results[1, 1] = rmse(housing_data_trn[,"Median_House_Value"], predict(hand_picked_add_model, newdata = housing_data_trn))
-results[2, 1] = rmse(housing_data_trn[,"Median_House_Value"], predict(hand_picked_int_model, newdata = housing_data_trn))
-results[3, 1] = rmse(housing_data_trn[,"Median_House_Value"], predict(hand_picked_int_model_aic, newdata = housing_data_trn))
-results[1, 2] = rmse(housing_data_tst[,"Median_House_Value"], predict(hand_picked_add_model, newdata = housing_data_tst))
-results[2, 2] = rmse(housing_data_tst[,"Median_House_Value"], predict(hand_picked_int_model, newdata = housing_data_tst))
-results[3, 2] = rmse(housing_data_tst[,"Median_House_Value"], predict(hand_picked_int_model_aic, newdata = housing_data_tst))
-results[1, 3] = get_num_params(hand_picked_add_model)
-results[2, 3] = get_num_params(hand_picked_int_model)
-results[3, 3] = get_num_params(hand_picked_int_model_aic)
-
-kable(results)
+comparison_table = compare_models(models_to_compare, mnames, housing_data_trn, housing_data_tst)
+kable(comparison_table)
 ```
 
 
-Here we can see that all of the terms are important to building the model with a low `Pr(>|t|)`. We want to test the VIF with this model
+What can be seen here is that with a serious increase in number of predictors (a jump from 9 to 25)  we see marginal improvements in adjusted $R^2$, RMSE and a massive performance drop in LOOCV. 
 
-```{r, vif-1}
-library(faraway)
-mean(vif(full_add_model))
-mean(vif(full_add_model_aic))
-mean(vif(hand_picked_add_model))
+
+## 2.3 Model Comparison and Selection
+
+At this point we will compare most of the models we developed in a single table for comparison and final selection.
+
+```{r}
+
+mnames = c("Additive", "Additive / BIC", "Hand Picked", "Hand Picked with Transform", "Cities Removed", "Fully Interactive", "Interactive BIC")
+models_to_compare = vector(mode="list", length=6)
+models_to_compare[[1]] = full_add_model
+models_to_compare[[2]] =  full_add_model_bic
+models_to_compare[[3]] = hand_picked_add_model
+models_to_compare[[4]] = hand_picked_add_model_transform
+models_to_compare[[5]] =  no_city_add_model_transform
+models_to_compare[[6]] =  hand_picked_int_model
+models_to_compare[[7]] = hand_picked_int_model_aic
+
+
+
+comparison_table = compare_models(models_to_compare, mnames, housing_data_trn, housing_data_tst)
+kable(comparison_table)
+
+
+```
+
+The `Hand Picked with Transform` Model appears to be the best choice for balancing the desired ends and will be declared **Our Winner** Its adjusted R-squared is very close to a fully additive model, it has a very low VIF. A competitive RMSE and a low number of parameters. Additionally, The `Cities Removed` model is  very good for how few predictors it has. Also the Interactive BIC would be a good choice model if there was no concern about how many predictors were used.
+```{r}
+coef(hand_picked_add_model_transform)
 ```
 
 
+# 3.0 Results
 
-## Model Comparison and Selection
+for our selected model.
+-qq plot
+-shapiro wilks
+-fitted vs residuals
+-Call compare function with only that as the input.
 
 
-
-# Results
+## Cut begin
 We now want to compare RMSE, $R^2$, and percent error of the different models we created.
 
 We did the forward and backward search of the interaction model above. So now we want to check num of parameters in the model
@@ -528,16 +617,21 @@ points(act, pred_chos, col=alpha(3, opacity), pch = 16, cex = point_size)
 abline(a = 0, b = 1, col = "darkorange", lwd = 3)
 legend("topleft", c("Simple Additive", "Interactive (Full)", "Interactive (AIC)"), col = c("dodgerblue", 2, 3), pch = 16)
 ```
-
+## Cut End
 
 
 *** 
 
-# Discussion
+# 4.0 Discussion
+
+## Graphs of Selected model performance
+
+
+- Talk about why it is better to have less 
 
 *** 
 
-# Appendix
+# 5.0 Appendix
 
 ***
 

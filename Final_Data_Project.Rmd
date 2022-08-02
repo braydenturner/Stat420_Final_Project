@@ -370,7 +370,7 @@ get_adj_r2 = function(model) {
 ```
 
 
-Now we want to get in to actually creating the model and choosing the best variables for prediction.Before we create any models however, we want to create a train / test set to use for evaluation later.
+Now we want to get in to actually creating the model and choosing the best variables for prediction. Before we create any models however, we want to create a train / test set to use for evaluation later.
 
 ```{r, split-train-test}
 set.seed(420)
@@ -379,51 +379,100 @@ housing_data_trn = housing_data[housing_data_idx, ]
 housing_data_tst = housing_data[-housing_data_idx, ]
 ```
 
-First we will create a simple additive model.
+What we will do next is start creating our models.
 
-```{r, model-1}
-add_model = lm(Median_House_Value ~ ., data = housing_data_trn)
-summary(add_model)
+First we will create a full model with all predictors. This will act as a control for using all of the available data, but contains the most parameters.
+
+```{r, full-additive-model}
+full_add_model = lm(Median_House_Value ~ ., data = housing_data_trn)
 ```
+
+Next we will step through the model to see if any parameters are not needed from the above full model aren't necessarily useful. We will run this for both AIC and BIC.
+
+```{r, full-additive-model-search}
+n = length(resid(full_add_model))
+full_add_model_aic = step(full_add_model, direction = "backward", trace = 0)
+```
+
+And finally on the additive models, we wanted to hand pick some of the parameters that we believe would have the best change at producing a good model. We will remove `Tot_Rooms`, `Tot_Bedrooms`, and `Population` since they have >.9 correlation with `Households`. We are also removing `Latitude` and `Longitude` since we extracted useful data close to cities. We will also transform `Distance_to_coast` and `dist_to_nearest_city` with a log function since we saw that house value drops off logarthithmically with distance from coast. We also drop `near_a_city_200` since we already have another Boolean for 100km. We also choose to drop `Media_Age` since from
+
+```{r, add-model-hand-picked}
+hand_picked_add_model = lm(Median_House_Value ~ . - Tot_Rooms - Tot_Bedrooms - Population - Latitude - Longitude - Distance_to_coast + log(Distance_to_coast)- dist_to_nearest_city + log(dist_to_nearest_city) - near_a_city_200 - Median_Age, data = housing_data_trn)
+```
+
+
+```{r}
+library(knitr)
+library(scales)
+
+rmse = function(actual, predicted) {
+  sqrt(mean((actual - predicted) ^ 2))
+}
+
+rnames = c("Full", "AIC", "Hand Picked")
+cnames = c("Train", "Test", "Num of Parameters")
+results = matrix(rep(0, 9), nrow=3, dimnames = list(rnames, cnames))
+
+results[1, 1] = rmse(housing_data_trn[,"Median_House_Value"], predict(full_add_model, newdata = housing_data_trn))
+results[2, 1] = rmse(housing_data_trn[,"Median_House_Value"], predict(full_add_model_aic, newdata = housing_data_trn))
+results[3, 1] = rmse(housing_data_trn[,"Median_House_Value"], predict(hand_picked_add_model, newdata = housing_data_trn))
+results[1, 2] = rmse(housing_data_tst[,"Median_House_Value"], predict(full_add_model, newdata = housing_data_tst))
+results[2, 2] = rmse(housing_data_tst[,"Median_House_Value"], predict(full_add_model_aic, newdata = housing_data_tst))
+results[3, 2] = rmse(housing_data_tst[,"Median_House_Value"], predict(hand_picked_add_model, newdata = housing_data_tst))
+results[1, 3] = get_num_params(full_add_model)
+results[2, 3] = get_num_params(full_add_model_aic)
+results[3, 3] = get_num_params(hand_picked_add_model)
+
+kable(results)
+```
+
+
+# NARRATIVE for above
+
+```{r}
+hand_picked_int_model = lm(Median_House_Value ~ (. - Tot_Rooms - Tot_Bedrooms - Population - Latitude - Longitude - Distance_to_coast + log(Distance_to_coast)- dist_to_nearest_city + log(dist_to_nearest_city) - near_a_city_200 - Median_Age) ^ 2, data = housing_data_trn)
+```
+
+Also AIC backward above
+
+```{r}
+hand_picked_int_model_aic = step(hand_picked_int_model, direction = "backward", trace = 0)
+```
+
+
+For 
+
+```{r}
+rnames = c("Additive", "Fully Interactive", "Step")
+cnames = c("Train", "Test", "Num of Parameters")
+results = matrix(rep(0, 9), nrow=3, dimnames = list(rnames, cnames))
+
+results[1, 1] = rmse(housing_data_trn[,"Median_House_Value"], predict(hand_picked_add_model, newdata = housing_data_trn))
+results[2, 1] = rmse(housing_data_trn[,"Median_House_Value"], predict(hand_picked_int_model, newdata = housing_data_trn))
+results[3, 1] = rmse(housing_data_trn[,"Median_House_Value"], predict(hand_picked_int_model_aic, newdata = housing_data_trn))
+results[1, 2] = rmse(housing_data_tst[,"Median_House_Value"], predict(hand_picked_add_model, newdata = housing_data_tst))
+results[2, 2] = rmse(housing_data_tst[,"Median_House_Value"], predict(hand_picked_int_model, newdata = housing_data_tst))
+results[3, 2] = rmse(housing_data_tst[,"Median_House_Value"], predict(hand_picked_int_model_aic, newdata = housing_data_tst))
+results[1, 3] = get_num_params(hand_picked_add_model)
+results[2, 3] = get_num_params(hand_picked_int_model)
+results[3, 3] = get_num_params(hand_picked_int_model_aic)
+
+kable(results)
+```
+
 
 Here we can see that all of the terms are important to building the model with a low `Pr(>|t|)`. We want to test the VIF with this model
 
 ```{r, vif-1}
 library(faraway)
-summary(add_model)
-vif(add_model)
+mean(vif(full_add_model))
+mean(vif(full_add_model_aic))
+mean(vif(hand_picked_add_model))
 ```
 
-Here we can see a couple variables (Tot_Bedrooms, Households, Latitude, and Longitude) all have slightly high VIF. If we perform an F-test with a model with these removed we can check if these are important to keep.
-
-```{r, model-2}
-small_mod = lm(Median_House_Value ~ . - Tot_Bedrooms - Households - Latitude - Longitude, data = housing_data_trn)
-anova(small_mod, add_model)
-```
-
-Here we can see the p-value is <2e-16, so we would reject the smaller model and would say these variables are important. With some of these variables we would assume their interaction with others would be important, say number of bedrooms to the distance to city center. So here we create an interaction model between all of the variables. 
-
-```{r, interaction-model}
-int_mod = lm(Median_House_Value ~ . ^ 2, data = housing_data_trn)
-get_num_params(int_mod)
-```
 
 
 ## Model Comparison and Selection
-With the model we created above, we want to step through the parameters to see what's useful to use in our final model. We below we try backward and forward AIC to compare model size and later on LOOCV-RMSE.
-```{r, backward-parameter-selection, eval = hardcore}
-back_mod_aic = step(int_mod, direction = "backward", trace = 0)
-```
-
-
-```{r,  forward-parameter-selection, eval = hardcore}
-mod = lm(Median_House_Value ~ 1, data = housing_data_trn)
-for_mod_aic = step(
-  mod,
-  scope = Median_House_Value ~ (Median_Income + Median_Age + Tot_Rooms + Tot_Bedrooms + Population + Households + Latitude + Longitude + Distance_to_coast +  nearest_city + dist_to_nearest_city + near_a_city_100 + near_a_city_200) ^ 2,
-  direction = "forward",
-  trace = 0)
-```
 
 
 
@@ -432,44 +481,23 @@ We now want to compare RMSE, $R^2$, and percent error of the different models we
 
 We did the forward and backward search of the interaction model above. So now we want to check num of parameters in the model
 
-```{r, eval = hardcore}
+```{r, eval = FALSE}
 get_num_params(back_mod_aic)
 get_num_params(for_mod_aic)
 ```
 
 Here we can see our forward model has less parameters than the backward search, so we want to check RMSE for both.
-```{r, eval = hardcore}
+```{r, eval = FALSE}
 get_loocv_rmse(back_mod_aic)
 get_loocv_rmse(for_mod_aic)
 ```
 
 The LOOCV-RMSE isn't significantly better, only `r (60487 - 60650) / 60487`% difference. So we would want the model with the lower complexity. We also ant to check RMSE for Train vs. Test for the 3 models (simple additive, interactive, step search model)
 
-```{r,RMSE, eval=hardcore}
-rmse = function(actual, predicted) {
-  sqrt(mean((actual - predicted) ^ 2))
-}
-
-rnames = c("Simple", "Interactive", "Step-Search")
-cnames = c("Train", "Test")
-results = matrix(rep(0, 6), nrow=3, dimnames = list(rnames, cnames))
-
-results[1, 1] = rmse(housing_data_trn[,"Median_House_Value"], predict(add_model, newdata = housing_data_trn))
-results[2, 1] = rmse(housing_data_trn[,"Median_House_Value"], predict(int_mod, newdata = housing_data_trn))
-results[3, 1] = rmse(housing_data_trn[,"Median_House_Value"], predict(for_mod_aic, newdata = housing_data_trn))
-results[1, 2] = rmse(housing_data_tst[,"Median_House_Value"], predict(add_model, newdata = housing_data_tst))
-results[2, 2] = rmse(housing_data_tst[,"Median_House_Value"], predict(int_mod, newdata = housing_data_tst))
-results[3, 2] = rmse(housing_data_tst[,"Median_House_Value"], predict(for_mod_aic, newdata = housing_data_tst))
-
-kable(results)
-```
 
 We now want to see how good our different models are at predicting data and each of their Adjusted $R^2$.
 
-```{r}
-
-library(knitr)
-library(scales)
+```{r, eval = FALSE}
 pred_simp = predict(add_model, newdata = housing_data_tst)
 pred_int = predict(int_mod, newdata = housing_data_tst)
 pred_chos = predict(for_mod_aic, newdata = housing_data_tst)
@@ -512,6 +540,9 @@ legend("topleft", c("Simple Additive", "Interactive (Full)", "Interactive (AIC)"
 # Appendix
 
 ***
+
+
+Possibly change Nearest San Jose to San Fransisco, since those 2 cities are close and the p-value is quite large for nearest_citySan Jose
  
 #### Group Members
 * Brayden Turner - brturne2 

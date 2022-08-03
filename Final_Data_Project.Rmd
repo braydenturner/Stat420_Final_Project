@@ -627,20 +627,20 @@ With this model we have 9 $\beta$ parameters, and can make all assessments using
 # 4.0 Discussion
 
 When choosing between multiple models we had the option to opt for more predictors to make a better model with a lower RMSE or less predictors to create a more easily understood and less computationally intense model. Our goal was to shrink the model to the smallest extent reasonable while still maintaining a comparable effectiveness. We were able to accomplish this through the following steps:  
-1) The transformation of 4 variables into 4 variables that were more intuitive for use.  
+1) The transformation of 4 variables into 4 variables that were more intuitive for us to use and interpret, which we were then able to perform transformations on.
 2) An initial assessment of the variables and trends.  
-3) An initial additive model  
+3) An initial fully additive model that used all available predictors
 4) An attempt to use AIC and BIC search to reduce model size.   
-5) Model hand pruning using information gathered in **step 2**.   
+5) Model hand pruning using information gathered in **step 2** and using variables from **step 1**.   
 6) An attempt to increase the size of the model to see performance increases.   
 7) Final comparison and selection.   
 
 
 There are certainly more models that we could have created and tested; indeed there were many model choices that we created and left out of this document in order to preserve linearity of the process. However this was the most straightforward path we created and we removed some of these excess models to ensure we did not include excessive unproductive tinkering.
 
-The group felt this model was a nice balance, using only 6 variables and 9 predictors, resulting in a comparably successful model. We also felt this model is simple enough that it can be easily and intuitively understood and implied.
+The group felt this model was a nice balance, using only 6 variables and 9 predictors, resulting in a comparably successful model to the models with significantly more predictors and computational complexity. We also felt this model is simple enough that it can be easily and intuitively understood by a human as well. We saw
 
-So with our chosen model, a person could take this model along with a few metrics from a city block (like median income, median age of the houses within that block, number of households, etc.) and predict the Median House Value to determine whether a house for sale could be over or under valued.
+So with our chosen model, a person could take this model along with a few metrics from a city block (like median income, median age of the houses within that block, number of households, etc.) and predict the Median House Value to determine whether a house for sale could be over or under valued. We could even take these metrics of ourselves and predict how accurately it values poperties in our own cities, or if this model could generically be used for other states as well.
 
 
 *** 

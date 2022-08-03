@@ -11,28 +11,6 @@ output:
     hardcore: FALSE
 ---
 ***    
-# Instructions DELETE BEFORE SUBMISSION
-
-[Project Instructions Page](https://d18ky98rnyall9.cloudfront.net/IAZ-yE1WQPWGfshNVoD1SQ_9a94df6ec90a4643aad57503dfa2a4f1_data-project-su22.html?Expires=1659225600&Signature=eLrwlUo9dqDJC3rmDl2CYqyfn1U-MreTF6Wgy7L5TfT6QfJHweAbSitGHvWi-XWmMx7b3m9EMCvATJkFvRBVyEgPExCRwB8OUQhhJrQtOyI2P437ms3fLT1aqcOoBxoR8tgJ84FYYXQexOvDURrboIn7CYkHTjCqCcK79tUiZMU_&Key-Pair-Id=APKAJLTNE6QMUY6HBC5A)
-
-[Project Instruction Video](https://mediaspace.illinois.edu/media/0_q1hn44wt)  
-
-
-**Notes from Video instructions**
-
-- Expectation is that we explore the data. Introduction lays out a much more robust background.
-- Methods section 1 is where we introduce some exploratory analysis, explore correlation analysis, scatterplots, colinearity, explore.
-- Methods section 2 is where we take our exploratory analysis then build some models and maybe we stop at additive, maybe we go from additive to interactive. analyze RMSE, adj.r.squared, residual std error.
--No matter what we then look for how to improve our additive model by shrinking the model intelligently or growing the model.  
-
-- choose a couple of models into a table  
--- model, AIC/BIC, number of variables, RMSE, some stats
-
-**The goal of the project is to explore the data, not make the best model**  
-The best way to fail is to make a path and just stick to it. Don't put the blinders on.
-
-
-***
 
 ```{r, setup, echo = FALSE, message = FALSE, warning = FALSE}
 options(scipen = 1, digits = 4, width = 80, fig.align = "center")
@@ -102,6 +80,7 @@ library(scales)
 library(knitr)
 library(lmtest)
 library(faraway)
+library(ggplot2)
 
 housing_data =  read.csv("California_Houses.csv")
 ```
@@ -621,6 +600,16 @@ kable(comparison_table)
 
 With this model we have 9 $\beta$ parameters, and can make all assessments using only 6 variables `Median_Income`, `Households`, `nearest_city`, `near_a_city_100`, `Distance_to_coast`, `dist_to_nearest_city`. We have a RMSE of about \$69,000, which means we can expect an appropriate ballpark estimate, but not a zeroed in exact guess of `Median_House_Value`.  The model has a mean variance inflation factor of 1.567. A Leave one out cross-validated score of 69,256 and an adjusted $R^2$ of 0.6403.
 
+
+We will also take the opportunity to assess how this model performs geographically.
+```{r}
+library(ggplot2)
+all_residuals = abs(housing_data$Median_House_Value - predict(hand_picked_add_model_transform, newdata = housing_data))
+map = ggplot(housing_data, aes(Longitude, Latitude, fill = all_residuals)) + geom_tile()
+map + scale_fill_viridis_c()
+```
+
+The model appears to have uniform distribution geographically with a small area of high residuals in the Santa Monica area. This is a great sign for our purposes because it indicates that this model has relatively high uniform performance.
 
 *** 
 

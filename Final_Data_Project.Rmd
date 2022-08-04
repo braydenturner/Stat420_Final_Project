@@ -19,10 +19,12 @@ options(scipen = 1, digits = 4, width = 80, fig.align = "center")
 hardcore = TRUE
 ```
 
-# 1.0 Introduction
-The data we have chosen to look at is Housing Prices in California. This data comes from [Kaggle](https://www.kaggle.com/datasets/fedesoriano/california-housing-prices-data-extra-features) and outlines data that would go in to predicting the price of a house in California. As people who currently rent (and one of us living in California), we hope to one day be able to purchase a home and being able to understand this model could help us determine important factors in predicting the price and whether future ones we intend to buy are a good deal or not. 
+***
 
-In this document we will modify and assess the data, then using our asssessments attempt to build a good model which does not over fit or under fit the data. We hope to be able to create a general model that based on some factors about a given property can give an expected price as an output. 
+# 1.0 Introduction
+The data we have chosen to look at is Housing Prices in California. This data comes from [Kaggle](https://www.kaggle.com/datasets/fedesoriano/california-housing-prices-data-extra-features) and outlines data that would go in to predicting the price of a house in California. On Kaggle the dataset is named `California Housing Prices Data (5 new features!)` it was originally drawn from  the paper `Pace, R. Kelley, and Ronald Barry. "Sparse spatial autoregressions." Statistics & Probability Letters 33.3 (1997): 291-297.` As people who currently rent (and one of us living in California), we hope to one day be able to purchase a home and being able to understand this model could help us determine important factors in predicting the price and whether future ones we intend to buy are a good deal or not. 
+
+In this document we will modify and assess the data, then using our assessments attempt to build a good model which does not over fit or under fit the data. We hope to be able to create a general model that based on some factors about a given property can give an expected price as an output. 
 
 
 Original Variables:  
@@ -74,7 +76,7 @@ Variables added by the group later in the project:
 ### 2.1.1 Read-in
 First we need to load in the data and prepare some of the columns. 
 
-```{r, readin}
+```{r message=FALSE}
 library(readr)
 library(scales)
 library(knitr)
@@ -88,9 +90,11 @@ housing_data =  read.csv("California_Houses.csv")
 
 To augment the data a bit, we need to take the predictors `Distance_to_LA`, `Distance_to_SanDiego`, `Distance_to_SanJose`, and `Distance_to_SanFrancisco` and convert them into two separate columns:
 
- - a factor variable `nearest_city`- This segments the data into regions of California and if there is any relevance in being closer to one city vs. another. 
+ - a factor variable `nearest_city`- This segments the data into regions of California and will help to indicate if there is any relevance in being closer to one city vs. another. 
  
  - a numeric variable `dist_to_nearest_city` - This will give us the distance to this nearest city in kms. 
+
+***
 
 ### 2.1.2 Geographic Modifications and Assessment
 
@@ -118,7 +122,7 @@ housing_data$dist_to_nearest_city = dist_to_nearest
 ```
 
 We will then perform a quick assessment of the variables we just created.
-First, we will inspect what percentage of the properties is closest to each city
+First, we will inspect what percentage of the data is closest to each city.
 
 ```{r, nearest-city-table}
 data.frame(
@@ -177,14 +181,14 @@ We also see that around the 200km mark is where the whisker ends on our box plot
 mean(housing_data$dist_to_nearest_city < 200)
 ```
 
-given that more than 91% of the data falls within 200 km of a city we will also create another factor variable for this value. 
+Given that more than 91% of the data falls within 200 km of a city we will also create another factor variable for this value. 
 
 ```{r}
 housing_data$near_a_city_200 = as.factor(housing_data$dist_to_nearest_city < 200)
 ```
 
 
-Our hope here is that one of the two factor variables created will be a sufficient demarcation line to where certain variables start to have differing effects on the response when we build a model. We will explore that further later.
+Our hope here is that one of the two factor variables created will be a sufficient demarcation line of where certain variables start to have differing effects on the response when we build a model. We will explore that further later.
 
 ```{r, near-a-city-assessment}
 mean(as.numeric(housing_data$near_a_city_100) - 1)
@@ -207,9 +211,13 @@ housing_data = subset(housing_data,
                                   Distance_to_SanJose))
 ```
 
+And we will review the remaining variables quickly before we move to our analysis phase.
+
 ```{r, listofnames}
 data.frame(name = names(housing_data))
 ``` 
+
+***
 
 ### 2.1.3 General Data Analysis
 
@@ -229,7 +237,7 @@ plot(housing_data[ , c(2:7, 10,12)],
 A couple of obvious co-linearities jump out. To better see that numerically, we will use the `cor` function from the `faraway` package
 
 ```{r}
-round(cor(housing_data[ , c(2:10,12)]), 2)
+kable(round(cor(housing_data[ , c(2:10,12)]), 2), col.names = c("Income", "Age", "Rooms", "Bedrooms", "Pop.", "Households", "Lat.", "Long.", "Coast", "Nearest City"))
 ```
 
 Below are some of the variables with strong correlation
@@ -241,7 +249,7 @@ Below are some of the variables with strong correlation
 - `Tot_Bedrooms` - `Households`  
 - `Population` - `Household`
 
-It appears that the variables that have to do with density see a strong positive correlation. This makes sense. As the total number of people within a block (`population`) increases, you also see an increase in total households within a block (`Households`) which leads to an increase in both total bedrooms (`Total_Bedrooms`) and total rooms (`Total_Rooms`). We are not attempting to demonstrate causation, simply how density indicators are linked to each other.
+It appears that the variables that have to do with density see a strong positive correlation. This makes sense. As the total number of people within a block (`Population`) increases, you also see an increase in total households within a block (`Households`) which leads to an increase in both total bedrooms (`Total_Bedrooms`) and total rooms (`Total_Rooms`). We are not attempting to demonstrate causation, simply how density indicators are linked to each other.
 
 These variables may still have interactions. For instance an area where the population density is low and the number of rooms is high or the number of households is low but the number of rooms is high may indicate an increase in house value. We will keep this in mind for later.
 
@@ -289,29 +297,40 @@ plot(housing_data[sf, c(2:7, 10,12)],
 plot(housing_data[sj, c(2:7, 10,12)],
      main = "San Jose Based Plots",
      col = 4)
-
 ```
 
 
 The last graph we will create for assistance is a graph of `Median_House_Value` vs all other predictors.
 
 ```{r}
+names(housing_data)
+```
+We will break it up into all variables in the first section and Latitude vs Longitude in the second section.
+
+```{r}
 par(mfrow = c(3,3))
-plot(Median_House_Value ~ Median_Income, housing_data, col = 1)
-plot(Median_House_Value ~ Median_Age, housing_data, col = 2)
-plot(Median_House_Value ~ Tot_Rooms, housing_data, col = 3)
-plot(Median_House_Value ~ Tot_Bedrooms, housing_data, col = 4)
-plot(Median_House_Value ~ Population, housing_data, col = 5)
-plot(Median_House_Value ~ Households, housing_data, col = 6)
-plot(Median_House_Value ~ Latitude, housing_data, col = 7)
-plot(Median_House_Value ~ Distance_to_coast, housing_data, col = 8)
-plot(Median_House_Value ~ dist_to_nearest_city, housing_data, col = 9)
+plot(Median_House_Value ~ Median_Income, housing_data, col = 1, xlab ="House Value", ylab = "Median Income")
+plot(Median_House_Value ~ Median_Age, housing_data, col = 2, xlab ="House Value", ylab = "Median Age")
+plot(Median_House_Value ~ Tot_Rooms, housing_data, col = 3, xlab ="House Value", ylab = "Total Rooms")
+plot(Median_House_Value ~ Tot_Bedrooms, housing_data, col = 4, xlab ="House Value", ylab = "Total Bedrooms")
+plot(Median_House_Value ~ Population, housing_data, col = 5, xlab ="House Value", ylab = "Total Population")
+plot(Median_House_Value ~ Households, housing_data, col = 6, xlab ="House Value", ylab = "Total Households")
+plot(Median_House_Value ~ Distance_to_coast, housing_data, col = 7, xlab ="House Value", ylab = "Distance to Coast")
+plot(Median_House_Value ~ dist_to_nearest_city, housing_data, col = 8, xlab ="House Value", ylab = "Distance to Coast")
 ```
 
-## 2.2 Model Creation and Refinement
-To start things off, we are creating a few helper functions for helping us build and evaluate the models we create
+```{r}
+par(mfrow = c(1,2))
+plot(Median_House_Value ~ Latitude, housing_data, col = 9)
+plot(Median_House_Value ~ Longitude, housing_data, col = 10)
+```
 
-```{r, make-functions, echo = FALSE, message = FALSE, warning = FALSE}
+***
+
+## 2.2 Model Creation and Refinement
+To start things off, we will create a few helper functions to help us build and evaluate the models we create
+
+```{r, make-functions, message = FALSE, warning = FALSE}
 plot_fitted_resid = function(model, pointcol = "dodgerblue", linecol = "darkorange") {
   plot(fitted(model), resid(model), 
        main = "Fitted vs Residuals",
@@ -383,7 +402,7 @@ housing_data_tst = housing_data[-housing_data_idx, ]
 
 What we will do next is create our models. We will refine and modify these models along the way and attempt to keep those which we deem significant.
 
-First we will create a full additive model with all predictors. This is a somewhat natural choice as a model which uses all available predictors is a simple and usable starting point. We will also check if any of these coefficients have a large p-value
+First we will create a fully additive model with all predictors. This is a somewhat natural choice as a model which uses all available predictors is a simple and usable starting point. We will also check if any of these coefficients have a large p-value
 
 ```{r, full-additive-model}
 full_add_model = lm(Median_House_Value ~ ., data = housing_data_trn)
@@ -399,9 +418,9 @@ full_add_model_bic = step(full_add_model, direction = "backward", trace = 0, k =
 c(AIC = length(coef(full_add_model_aic)),
   BIC = length(coef(full_add_model_bic)))
 ```
-We see that using a backwards AIC search we actually don't drop any variables from our search. BIC on the other hand dropped the  `Households` predictor from the model. We will use the BIC variant for comparison later.
+We see that using a backwards AIC search we actually don't drop any variables from our search. BIC on the other hand dropped the  `Households` predictor from the model. We will use the BIC variant for comparison later. This dropping of `Households` makes sense since that variable had such a strong colinearity with the rest of the density variables.
 
-However we suspect this model may still be too cumbersome and we would like to explore how we might decrease the size of the model intelligently. Instead we will hand pick some variables to drop based on our analysis in **Section 2.1.3.**  We will remove `Tot_Rooms`, `Tot_Bedrooms`, and `Population` since they have >.9 correlation with `Households` in an effort to pare down these 4 predictors to a single predictor. Next we will remove `Latitude` and `Longitude` since we have tried to capture geographic information through the nearest city variables. We will also drop the `near_a_city_200` from the model since it is a binary that only differentiates ~9% of the data and have `near_a_city_100` to attempt to capture this distinction as well. We will also remove `Median_Age` because it appeared to have no relationship with `Median_House_Value` per ourgraph of `Median_House_Value` vs all other predictors.
+However we suspect this model may still be too cumbersome and we would like to explore how we might decrease the size of the model intelligently. Instead we will hand pick some variables to drop from the fully additive model based on our analysis in **Section 2.1.3.**  We will remove `Tot_Rooms`, `Tot_Bedrooms`, and `Population` since they have >.9 correlation with `Households` in an effort to pare down these 4 predictors to a single predictor. Next we will remove `Latitude` and `Longitude` since we have tried to capture geographic information through the nearest city variables. We will also drop `near_a_city_200` from the model since it is a binary that only differentiates ~9% of the data and have `near_a_city_100` to attempt to capture this distinction as well. We will also remove `Median_Age` because it appeared to have no relationship with `Median_House_Value` per our graph of `Median_House_Value` vs all other predictors.
 
 
 ```{r, add-model-hand-picked}
@@ -421,7 +440,7 @@ comparison_table = compare_models(models_to_compare, mnames, housing_data_trn, h
 kable(comparison_table)
 ```
 
-We see essentially no change to performance with the BIC and an improvement of the Variance Inflation Factor over the full model. We also see the hand-picked model performing decently well across most of the metrics but a substantial decrease in VIF as well as a nice improvement in the number of indicators we have. It is a bit of a toss-up at this point as far as which models are best; reducing the number of predictors 40% is probably worth the performance decrease of about 10% in RMSE.
+We see essentially no change to performance with the BIC and an improvement of the Variance Inflation Factor over the full model. We also see the hand-picked model performing decently well across most of the metrics but a substantial decrease in VIF as well as a nice improvement in the number of indicators we have. It is a bit of a toss-up at this point as far as which models are best; reducing the number of predictors 43% is probably worth the performance decrease of about 10% in RMSE.
 
 However the model can still be improved. `dist_to_nearest_city` and `Distance_to_coast` both appear to have somewhat logarithmic relationships with `Median_House_Value`. So we will transform these two predictors in order to see how the model performs with this transform.
 
@@ -439,7 +458,7 @@ comparison_table = compare_models(models_to_compare, mnames, housing_data_trn, h
 kable(comparison_table)
 ```
 
-This new hand picked model with transforms appears to be a very strong performer. Outperforming the hand picked model in VIF, and comparing just about on par with the BIC model.
+This new hand picked model with transforms appears to be a very strong performer. Outperforming the hand picked model in VIF, and performing just about on par with the BIC model in RMSE and LOOCV.
 
 This new handpicked model is good but it is worth it at this point to see if any of the variables fail to reject the null hypothesis.
 
@@ -447,7 +466,9 @@ This new handpicked model is good but it is worth it at this point to see if any
 which(coef(summary(hand_picked_add_model_transform))[, "Pr(>|t|)"] > 0.05)
 ```
 
-San Jose being the closest appears to be insignificant. At this point we could include the variable because we deem it necessary, by going back and removing the Distance to San Jose column then only tracking distance to San Francisco, San Diego and Los Angeles. However for the sake of linearity we will not do that and instead press on with this model. We will also check how the current handpicked model performs if we cease tracking all nearest cities in an ANOVA test. As well as comparing the two models.
+San Jose being the closest city to a datum appears to be insignificant. At this point we could exclude the variable because we deem it necessary, by going back and removing the Distance to San Jose column then only tracking distance to San Francisco, San Diego and Los Angeles. However for the sake of linearity we will not do that and instead press on with this model. 
+
+Next, we will also check how the current handpicked model performs if we cease tracking all nearest cities in an ANOVA test and do a comparison of the two models.
 
 ```{r}
 no_city_add_model_transform = lm(Median_House_Value ~ . - Tot_Rooms - Tot_Bedrooms - Population - Latitude - Longitude - Distance_to_coast - nearest_city + log(Distance_to_coast) - dist_to_nearest_city + log(dist_to_nearest_city) - near_a_city_200 - Median_Age, data = housing_data_trn)
@@ -464,7 +485,7 @@ kable(comparison_table)
 
 ```
 
-We see that dropping cities from the model does not pass an Anova test and we would reject the null hypothesis. We reduce the number of predictors from 9 to 6 which is substantial and worthwhile, but we also lose an important categorical predictor for the sake of lucidity  of our model. Meaning it is a simple and straightforward part of the model to track "Of these 4 major cities in California, which is the nearest" Therefore we will opt to maintain nearest city in the model for now.
+We see that dropping cities from the model does not pass an Anova test and we would reject the null hypothesis. Dropping cities would reduce the number of predictors from 9 to 6 which is substantial and worthwhile, but we also lose an important categorical predictor for the sake of lucidity  of our model. Meaning it is a simple and straightforward part of the model to track "Of these 4 major cities in California, which is the nearest?" Therefore we will opt to maintain nearest city in the model for now.
 
 However the work is not done yet. It is still worth inspecting whether noticeable performance gains can be made by increasing this model or allowing for interactions between the chosen variables. So for the sake of comparison we well allow for all possible interaction variables of the hand picked model with transformations.
 
@@ -494,8 +515,9 @@ kable(comparison_table)
 ```
 
 
-What can be seen here is that with a serious increase in number of predictors (a jump from 9 to 25)  we see marginal improvements in adjusted $R^2$, RMSE and a massive performance drop in LOOCV. 
+What can be seen here is that with a serious increase in number of predictors (a jump from 9 to 25)  we see marginal improvements in adjusted $R^2$, RMSE and a large performance drop in LOOCV. 
 
+***
 
 ## 2.3 Model Comparison and Selection
 
@@ -521,9 +543,9 @@ kable(comparison_table)
 
 ```
 
-The `Hand Picked with Transform` Model appears to be the best choice for balancing the desired ends and will be declared **Our Winner**. Its adjusted R-squared is very close to a fully additive model, it has a very low VIF. A competitive RMSE and a low number of parameters. Additionally, The `Cities Removed` model is  very good for how few predictors it has. Also the Interactive BIC would be a good choice model if there was no concern about how many predictors were used.
+The `Hand Picked with Transform` Model appears to be the best choice for balancing the desired ends and will be declared **Our Winner**. Its adjusted R-squared is very close to a fully additive model, it has a very low VIF. A competitive RMSE and a low number of parameters. Of note, The `Cities Removed` model is  very good for how few predictors it has, and the Interactive BIC would be a good choice model if there was no concern about how many predictors were used.
 
-
+***
 
 # 3.0 Results
 
@@ -533,19 +555,20 @@ Our selected model is the model wherein we hand picked variables and performed t
 coef(summary(hand_picked_add_model_transform))
 ```
 
-This Model consists of of the following $\beta$ values.   
--`Intercept` of $465300.88. This is the baseline value for the region of LA and all further modifications will be made from that point.  
--`Median_Income` - \$37352.32 / \$10,000. Meaning that for an every dollar increase in median income within one block there is a corresponding increase in median house value of about 3.7 times that amount.  
--`Households` \$16.12 / Household. Meaning that for every additional household within a block the median house value increases by about 16.12 dollars.  
--`nearest_citySan Diego` -\$45102.61. The median price of a house on a block is \$45102.61 lower when in the vicinity of San Diego instead of Los Angeles.  
--`nearest_citySan Fransisco` -\$19074.91. The median price of a house on a block is \$19074.91 lower when in the vicinity of San Fransisco instead of Los Angeles.  
--`nearest_citySan Jose` -\$2927.43. The median price of a house on a block is \$2927.43 lower when in the vicinity of San Jose instead of Los Angeles.  
--`near_a_city_100TRUE`  -\$25644.62. The median price of a house on a block is \$25644.62 lower when within 100 km of a city.  
--`log(Distance_to_coast)` -\$30799.79. The median price of a house on a block is \$30799.79 lower for every increase of 1 in the value of the log() of the `Distance_to_Coast` variable. Put more simply at the coast, no decrease, at 1 mile from the coast is the baseline. At 10 miles from the coast there is a decrease of \$62k and at 100 miles from the coast there is \$92k decrease in value. At .1 miles from the coast there is a \$31k increase in value.  
--`log(dist_to_nearest_city)` -\$20790.74. The median price of a house is \$20790.74 lower for every increase of 1 in the value of the log() of the `dist_to_nearest_city`.  
+This Model consists of of the following $\beta$ values:  
+  
+- `Intercept` of $465300.88. This is the baseline value for the region of LA and all further modifications will be made from that point.  
+- `Median_Income` - \$37352.32 / \$10,000. Meaning that for an every dollar increase in median income within one block there is a corresponding increase in median house value of about 3.7 times that amount.  
+- `Households` \$16.12 / Household. Meaning that for every additional household within a block the median house value increases by about 16.12 dollars.  
+- `nearest_citySan Diego` -\$45102.61. The median price of a house on a block is \$45102.61 lower when in the vicinity of San Diego instead of Los Angeles.  
+- `nearest_citySan Fransisco` -\$19074.91. The median price of a house on a block is \$19074.91 lower when in the vicinity of San Fransisco instead of Los Angeles.  
+- `nearest_citySan Jose` -\$2927.43. The median price of a house on a block is \$2927.43 lower when in the vicinity of San Jose instead of Los Angeles.  
+- `near_a_city_100TRUE`  -\$25644.62. The median price of a house on a block is \$25644.62 lower when within 100 km of a city.  
+- `log(Distance_to_coast)` -\$30799.79. The median price of a house on a block is \$30799.79 lower for every increase of 1 in the value of the log() of the `Distance_to_Coast` variable. Put more simply at the coast, no decrease, at 1 mile from the coast is the baseline. At 10 miles from the coast there is a decrease of \$62k and at 100 miles from the coast there is \$92k decrease in value. At .1 miles from the coast there is a \$31k increase in value.  
+- `log(dist_to_nearest_city)` -\$20790.74. The median price of a house is \$20790.74 lower for every increase of 1 in the value of the log() of the `dist_to_nearest_city`.  
 
 
-Here is a plot of the actual housing prices vs the predicted price from our model
+Here is a plot of the actual housing prices vs the predicted price from our model.
 
 ```{r, eval = TRUE}
 pred = predict(hand_picked_add_model_transform, newdata = housing_data_tst)
@@ -558,6 +581,10 @@ point_size = .3
 plot(act, pred, xlab = "Actual Prices", ylab = "Predicted Prices", col=alpha("dodgerblue", opacity), pch = 16, cex = point_size, main = "Actual vs. Predicted Home Prices")
 abline(a = 0, b = 1, col = "darkorange", lwd = 3)
 ```
+
+It appears that as the price of a property moved past $300,000 our model typically undervalued the property.
+
+There is a very distinct line at the \$500,000 mark. We speculate that this could be for multiple reasons but we were unable to definitively come to a conclusion about why this is. External testing on our part demonstrated that removal of the data in that line would not have shifted our model significantly.
 
 Next we want to assess the normality of the error distribution. We will first do so visibly using a Q-Q plot.
 
@@ -616,9 +643,9 @@ The model appears to have uniform distribution geographically with a small area 
 # 4.0 Discussion
 
 When choosing between multiple models we had the option to opt for more predictors to make a better model with a lower RMSE or less predictors to create a more easily understood and less computationally intense model. Our goal was to shrink the model to the smallest extent reasonable while still maintaining a comparable effectiveness. We were able to accomplish this through the following steps:  
-1) The transformation of 4 variables into 4 variables that were more intuitive for us to use and interpret, which we were then able to perform transformations on.
+1) The transformation of 4 variables into 4 variables that were more intuitive for us to use and interpret, which we were then able to perform transformations on.  
 2) An initial assessment of the variables and trends.  
-3) An initial fully additive model that used all available predictors
+3) An initial fully additive model that used all available predictors.  
 4) An attempt to use AIC and BIC search to reduce model size.   
 5) Model hand pruning using information gathered in **step 2** and using variables from **step 1**.   
 6) An attempt to increase the size of the model to see performance increases.   
@@ -627,7 +654,7 @@ When choosing between multiple models we had the option to opt for more predicto
 
 There are certainly more models that we could have created and tested; indeed there were many model choices that we created and left out of this document in order to preserve linearity of the process. However this was the most straightforward path we created and we removed some of these excess models to ensure we did not include excessive unproductive tinkering.
 
-The group felt this model was a nice balance, using only 6 variables and 9 predictors, resulting in a comparably successful model to the models with significantly more predictors and computational complexity. We also felt this model is simple enough that it can be easily and intuitively understood by a human as well. We saw
+The group felt this model was a nice balance, using only 6 variables and 9 predictors, resulting in a comparably successful model to the models with significantly more predictors and computational complexity. We also felt this model is simple enough that it can be easily and intuitively understood by a human as well.  
 
 So with our chosen model, a person could take this model along with a few metrics from a city block (like median income, median age of the houses within that block, number of households, etc.) and predict the Median House Value to determine whether a house for sale could be over or under valued. We could even take these metrics of ourselves and predict how accurately it values poperties in our own cities, or if this model could generically be used for other states as well.
 
@@ -638,12 +665,12 @@ So with our chosen model, a person could take this model along with a few metric
 
 ***
 
-We noticed a very distinct and noticeable line in the residuals as well as the actual vs predicted Home Prices. Below we can see a large number of the home prices are ~\$500,000 and nothing greater than that in the data
+We noticed a very distinct and noticeable line in the residuals as well as the actual vs predicted Home Prices. Below we can see a large number of the home prices are ~\$500,000 and nothing greater than that in the data. Of the roughly 20k blocks listed, ~1000 of them had a median house value spaced 200 dollars apart between \$499,900 and \$500,100.  
 ```{r}
 sum(housing_data$Median_House_Value > 499900 & housing_data$Median_House_Value  < 500100)
 ```
 
-We tried to remove these data points to see if it had any effect on our models and results, but everything turned out roughly the same.
+We tried to remove these data points to see if it had any effect on our models and results, but everything turned out roughly the same. 
 
  
 #### Group Members
